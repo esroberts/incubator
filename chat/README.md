@@ -6,7 +6,7 @@ Simple TCP chat server and client.  I started this to explore Go's concurrency i
 
 # Running
 Run a single server and multiple clients in separate terminals.
-```aidl
+```zsh
 # Server (single)
 > go run server/chat_server.go
 
