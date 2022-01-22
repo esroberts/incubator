@@ -17,8 +17,13 @@ Run a single server and multiple clients in separate terminals.
 # TODO
 - concurrent error handling
 - colorized terminal output
+- common client/server message serialization
+- message compression
+- message encryption
 - utilize channels as means of concurrently write stdout and record file-based chat log
 - parameterize config info (e.g. port, etc)
+
+# Future Ideas
 - concept of chat "rooms" with join/leave capability
 - add persistence and stateless servers with high availability
 
