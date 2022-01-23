@@ -122,9 +122,14 @@ func handleUserConnection(id string, clientConn net.Conn, connMap *sync.Map) {
 func broadcast(connMap *sync.Map, clientConn net.Conn, protoMessage *chat.Message) {
 
 	var clientAddr string
+	var messageFromAddr string
 	if protoMessage != nil {
 		clientAddr = protoMessage.FromIp
+		messageFromAddr = clientAddr
 		log.Printf("Client %v sent a message of size %v\n", protoMessage.FromIp, len(protoMessage.Text))
+	} else {
+		clientAddr = clientConn.RemoteAddr().String()
+		messageFromAddr = clientConn.LocalAddr().String()
 	}
 
 	// Fan-out write
@@ -144,7 +149,7 @@ func broadcast(connMap *sync.Map, clientConn net.Conn, protoMessage *chat.Messag
 				message = protoMessage.Text
 			}
 
-			sizeHeader, messageBody := marshalMessage(message, clientAddr)
+			sizeHeader, messageBody := marshalMessage(message, messageFromAddr)
 			data := append(sizeHeader[:], messageBody...)
 
 			if _, err := conn.Write(data); err != nil {

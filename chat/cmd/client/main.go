@@ -1,22 +1,49 @@
 package main
 
 import (
-	"bufio"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
+	ui "github.com/gizak/termui/v3"
+	"github.com/gizak/termui/v3/widgets"
 	"google.golang.org/protobuf/proto"
 	"rustedskyline.io/tcpchat/internal/common"
 	chat "rustedskyline.io/tcpchat/internal/proto"
 )
 
+const InputPrompt = "> "
+
 func main() {
+	if err := ui.Init(); err != nil {
+		log.Fatalf("failed to initialize termui: %v", err)
+	}
+	defer ui.Close()
+
+	chatPane := initChatPane()
+	chatInput := initInputPane()
+
+	ui.Render(chatPane)
+	ui.Render(chatInput)
+
+	grid := ui.NewGrid()
+	termWidth, termHeight := ui.TerminalDimensions()
+	grid.SetRect(0, 0, termWidth, termHeight)
+
+	grid.Set(
+		ui.NewRow(0.8,
+			ui.NewCol(1.0, chatPane),
+		),
+		ui.NewRow(0.2,
+			ui.NewCol(1.0, chatInput),
+		),
+	)
+
+	ui.Render(grid)
+
 	conn, err := net.Dial("tcp", "localhost:9090")
 	if err != nil {
 		log.Fatalf("client failed to connect %v", err)
@@ -31,44 +58,45 @@ func main() {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go readStdin(conn)
-	go readServer(conn)
+	go func() {
+		for e := range ui.PollEvents() {
+			if e.Type == ui.KeyboardEvent {
+				if e.ID == "<Enter>" {
+					sendMessage(conn, chatInput.Text)
+					chatPane.Rows = append(chatPane.Rows, chatInput.Text)
+					chatInput.Text = InputPrompt
+				} else if e.ID == "<C-c>" {
+					ui.Close()
+					wg.Done()
+					os.Exit(0)
+				} else if e.ID == "<Space>" {
+					chatInput.Text += " "
+				} else if e.ID == "<Backspace>" {
+					chatInput.Text = chatInput.Text[:len(chatInput.Text)-1]
+				} else {
+					chatInput.Text += e.ID
+				}
+				ui.Render(chatPane)
+				ui.Render(chatInput)
+			}
+		}
+	}()
+
+	go readServer(conn, chatPane)
 	wg.Wait()
 }
 
-// Read from stdin and print input to connection indefinitely
-func readStdin(conn net.Conn) {
-	for {
-		reader := bufio.NewReader(os.Stdin)
-		prompt()
-		input, _ := reader.ReadString('\n')
+func sendMessage(conn net.Conn, input string) {
+	sizeHeader, messageBody := marshalMessage(input, conn.LocalAddr().String())
+	data := append(sizeHeader[:], messageBody...)
 
-		if strings.TrimSpace(input) == "h" {
-			log.Printf(
-				"\nHelp:\n" +
-					"  <message> Enter send message\n" +
-					"  h print this help\n" +
-					"  q quit client\n",
-			)
-		}
-
-		if strings.TrimSpace(input) == "q" {
-			log.Println("Exiting client")
-			conn.Close()
-			os.Exit(0)
-		}
-
-		sizeHeader, messageBody := marshalMessage(input, conn.LocalAddr().String())
-		data := append(sizeHeader[:], messageBody...)
-
-		if _, err := conn.Write(data); err != nil {
-			log.Printf("error on writing to connection %v\n", err)
-		}
+	if _, err := conn.Write(data); err != nil {
+		log.Printf("error on writing to connection %v\n", err)
 	}
 }
 
 // Read from connection and print contents indefinitely
-func readServer(conn net.Conn) {
+func readServer(conn net.Conn, chatPane *widgets.List) {
 	for {
 		data := make([]byte, 1024)
 		n, err := conn.Read(data)
@@ -83,13 +111,9 @@ func readServer(conn net.Conn) {
 			log.Printf("error unmarshalling proto message %v", err)
 		}
 
-		fmt.Printf(protoMessage.Text)
-		prompt()
+		chatPane.Rows = append(chatPane.Rows, "["+protoMessage.FromIp+"] "+protoMessage.Text)
+		ui.Render(chatPane)
 	}
-}
-
-func prompt() {
-	fmt.Print(">> ")
 }
 
 func marshalMessage(text string, fromIp string) ([]byte, []byte) {
@@ -104,4 +128,19 @@ func marshalMessage(text string, fromIp string) ([]byte, []byte) {
 	b := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, uint32(len(data)))
 	return b, data
+}
+
+func initInputPane() *widgets.Paragraph {
+	p := widgets.NewParagraph()
+	p.Text = InputPrompt
+	return p
+}
+
+func initChatPane() *widgets.List {
+	l := widgets.NewList()
+	l.Title = "Chat"
+	l.Rows = []string{}
+	l.TextStyle = ui.NewStyle(ui.ColorYellow)
+	l.WrapText = false
+	return l
 }
