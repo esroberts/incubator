@@ -118,12 +118,17 @@ func broadcast(connMap *sync.Map, clientConn net.Conn, protoMessage *chat.Messag
 	//TODO: pass connection by address
 	//TODO: find better pattern for welcomeSentinel
 
+	var clientAddr string
+	if protoMessage != nil {
+		clientAddr = protoMessage.FromIp
+		log.Printf("Client %v sent a message of size %v\n", protoMessage.FromIp, len(protoMessage.Text))
+	}
+
 	// Fan-out write
 	connMap.Range(func(key, value interface{}) bool {
 		if conn, ok := value.(net.Conn); ok {
-			//TODO: get client addr from protobuf
-			clientAddr := clientConn.RemoteAddr().String()
-			// don't send a response to the client that just talked
+
+			// skip client that sent the message
 			if conn.RemoteAddr().String() == clientAddr {
 				// Within sync.Map.Range() acts as a continue
 				return true
