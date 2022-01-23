@@ -115,8 +115,6 @@ func handleUserConnection(id string, clientConn net.Conn, connMap *sync.Map) {
 
 // Broadcast a message to all connected clients
 func broadcast(connMap *sync.Map, clientConn net.Conn, protoMessage *chat.Message) {
-	//TODO: pass connection by address
-	//TODO: find better pattern for welcomeSentinel
 
 	var clientAddr string
 	if protoMessage != nil {
