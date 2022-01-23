@@ -8,10 +8,10 @@ Simple TCP chat server and client.  I started this to explore Go's concurrency i
 Run a single server and multiple clients in separate terminals.
 ```zsh
 # Server (single)
-> go run server/chat_server.go
+> go run cmd/server/main.go
 
 # Client (one or more)
-> go run client/chat_client.go
+> go run cmd/client/main.go
 ```
 
 # TODO
