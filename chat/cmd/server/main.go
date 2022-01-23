@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -96,7 +97,11 @@ func handleUserConnection(id string, clientConn net.Conn, connMap *sync.Map) {
 		data := make([]byte, 1024)
 		n, err := clientConn.Read(data)
 		if err != nil {
-			log.Printf("error reading from client %v", err)
+			if err == io.EOF {
+				log.Printf("Client %v disconnected", clientConn.RemoteAddr().String())
+			} else {
+				log.Printf("Unexpected error reading from client %v", err)
+			}
 			return
 		}
 		messageBody := data[4:n]

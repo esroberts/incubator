@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,11 +38,25 @@ func main() {
 
 // Read from stdin and print input to connection indefinitely
 func readStdin(conn net.Conn) {
-	//TODO: 'quit' command exits loop and cleanly exits program
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		prompt()
 		input, _ := reader.ReadString('\n')
+
+		if strings.TrimSpace(input) == "h" {
+			log.Printf(
+				"\nHelp:\n" +
+					"  <message> Enter send message\n" +
+					"  h print this help\n" +
+					"  q quit client\n",
+			)
+		}
+
+		if strings.TrimSpace(input) == "q" {
+			log.Println("Exiting client")
+			conn.Close()
+			os.Exit(0)
+		}
 
 		sizeHeader, messageBody := marshalMessage(input, conn.LocalAddr().String())
 		data := append(sizeHeader[:], messageBody...)
@@ -54,7 +69,6 @@ func readStdin(conn net.Conn) {
 
 // Read from connection and print contents indefinitely
 func readServer(conn net.Conn) {
-	//TODO: error cleanly exits program
 	for {
 		data := make([]byte, 1024)
 		n, err := conn.Read(data)
